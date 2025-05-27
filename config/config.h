@@ -14,34 +14,25 @@
 #ifndef LINO_BASE_CONFIG_H
 #define LINO_BASE_CONFIG_H
 
-#define LED_PIN 13 // used for debugging status
-
-// uncomment the base you're building
-//  #define LINO_BASE DIFFERENTIAL_DRIVE       // 2WD and Tracked robot w/ 2 motors
-//  #define LINO_BASE SKID_STEER            // 4WD robot
-//  #define LINO_BASE MECANUM               // Mecanum drive robot
+// base shape
 #define LINO_BASE OMNI
 
-// uncomment the motor driver you're using
-//  #define USE_GENERIC_2_IN_MOTOR_DRIVER      // Motor drivers with 2 Direction Pins(INA, INB) and 1 PWM(ENABLE) pin ie. L298, L293, VNH5019
-//  #define USE_GENERIC_1_IN_MOTOR_DRIVER      // Motor drivers with 1 Direction Pin(INA) and 1 PWM(ENABLE) pin.
-#define USE_BTS7960_MOTOR_DRIVER // BTS7970 Motor Driver
-// #define USE_ESC_MOTOR_DRIVER               // Motor ESC for brushless motors
+// define motor driver
+#define USE_BTS7960_MOTOR_DRIVER
 
-// uncomment the IMU you're using
-//  #define USE_GY85_IMU
-//  #define USE_MPU6050_IMU
-//  #define USE_MPU9150_IMU
-//  #define USE_MPU9250_IMU
+// define the imu sensor
 #define USE_BNO055_IMU
 
-#define K_P 90            // 55
-#define K_I 366.101694915 // 0.045454545
-#define K_D 0             // 0
+#define K_P 90
+#define K_I 366.101694915
+#define K_D 0
 
-#define drib_kp 0.5 // 1  //0.9 //1.2
-#define drib_ki 0   // 0 //0.0001 // 0.00006
-#define drib_kd 0.2 // 0  //0 //0.000015
+#define ESC_UP_KP 1
+#define ESC_UP_KI 0
+#define ESC_UP_KD 0
+#define ESC_DOWN_KP 1
+#define ESC_DOWN_KI 0
+#define ESC_DOWN_KD 0
 
 /*
 ROBOT ORIENTATION
@@ -61,34 +52,23 @@ LEFT  = Y
           BACK
 */
 
-// define your robot' specs here
-#define MOTOR_MAX_RPS 8.4               // motor's max RPM
-#define MAX_RPS_RATIO 1.3               // max RPM allowed for each MAX_RPM_ALLOWED = MOTOR_MAX_RPM * MAX_RPM_RATIO
-#define MOTOR_OPERATING_VOLTAGE 24      // motor's operating voltage (used to calculate max RPM)
-#define MOTOR_POWER_MAX_VOLTAGE 24      // max voltage of the motor's power source (used to calculate max RPM)
-#define MOTOR_POWER_MEASURED_VOLTAGE 24 // current voltage reading of the power connected to the motor (used for calibration)
-#define COUNTS_PER_REV1 3840            // wheel1 encoder's no of ticks per rev
-#define COUNTS_PER_REV2 3840            // wheel2 encoder's no of ticks per rev
-#define COUNTS_PER_REV3 3840            // wheel3 encoder's no of ticks per rev
-#define COUNTS_PER_REV4 3840            // wheel4 encoder's no of ticks per rev
-#define WHEEL_DIAMETER 0.0985           // wheel's diameter in meters
-#define ROBOT_DIAMETER 0.46             // distance between left and right wheels
+// define robot' specs here
+#define MOTOR_MAX_RPS 8.4
+#define MAX_RPS_RATIO 1.3
+#define MOTOR_OPERATING_VOLTAGE 24
+#define MOTOR_POWER_MAX_VOLTAGE 24
+#define MOTOR_POWER_MEASURED_VOLTAGE 2
+#define COUNTS_PER_REV1 3840
+#define COUNTS_PER_REV2 3840
+#define COUNTS_PER_REV3 3840
+#define COUNTS_PER_REV4 3840
+#define WHEEL_DIAMETER 0.0985
+#define ROBOT_DIAMETER 0.46
 #define ROBOT_RADIUS 0.23
 #define PWM_BITS 8
 #define PWM_FREQUENCY 25000
 
-// INVERT ENCODER COUNTS
-#define MOTOR1_ENCODER_INV false
-#define MOTOR2_ENCODER_INV false
-#define MOTOR3_ENCODER_INV false
-#define MOTOR4_ENCODER_INV false
-
-// INVERT MOTOR DIRECTIONS
-#define MOTOR1_INV false
-#define MOTOR2_INV false
-#define MOTOR3_INV false
-#define MOTOR4_INV false
-
+// declare encoder pin
 #define MOTOR3_ENCODER_A 14
 #define MOTOR3_ENCODER_B 15
 
@@ -101,6 +81,15 @@ LEFT  = Y
 #define MOTOR2_ENCODER_A 26
 #define MOTOR2_ENCODER_B 27
 
+#define LAUNCHER_UP_A 11
+#define LAUNCHER_UP_B 12
+
+#define LAUNCHER_DOWN_A 38
+#define LAUNCHER_DOWN_B 39
+// store encoder in array
+const int enca[6] = {MOTOR1_ENCODER_A, MOTOR2_ENCODER_A, MOTOR3_ENCODER_A, MOTOR4_ENCODER_A, LAUNCHER_DOWN_A, LAUNCHER_UP_A};
+const int encb[6] = {MOTOR1_ENCODER_B, MOTOR2_ENCODER_B, MOTOR3_ENCODER_B, MOTOR4_ENCODER_B, LAUNCHER_DOWN_B, LAUNCHER_UP_B};
+
 // catcher motor
 #define catcher_cw 36
 #define catcher_ccw 37
@@ -108,27 +97,20 @@ LEFT  = Y
 #define prox_back 32
 #define prox_dribble 31
 
-// servo
-#define servo 8
-
+// esc motor
 #define esc_up 33
 #define esc_down 2
 
 // MOTOR PINS
-
-// #define MOTOR1_PWM -1  // DON'T TOUCH THIS! This is just a placeholder
 #define MOTOR3_IN_A 18 // 2
 #define MOTOR3_IN_B 19 // 2
 
-// #define MOTOR2_PWM -1 // DON'T TOUCH THIS! This is just a placeholder
 #define MOTOR4_IN_A 22 // 4
 #define MOTOR4_IN_B 10 // 4
 
-// #define MOTOR3_PWM -1 // DON'T TOUCH THIS! This is just a placeholder
 #define MOTOR1_IN_A 5 // 1
 #define MOTOR1_IN_B 6 // 1
 
-// #define MOTOR4_PWM -1 // DON'T TOUCH THIS! This is just a placeholder
 #define MOTOR2_IN_A 3
 #define MOTOR2_IN_B 4
 
@@ -175,15 +157,16 @@ struct but
      int right;
 } button;
 
-struct joy {
-  double axis0_x;
-  double axis0_y;
-  double axis1_x;
-  double axis1_y;
-  int but_red;
-  int but_blue;
-  int but_black;
-  int but_green;
+struct joy
+{
+     double axis0_x;
+     double axis0_y;
+     double axis1_x;
+     double axis1_y;
+     int but_red;
+     int but_blue;
+     int but_black;
+     int but_green;
 } joystick;
 
 int solenoid = 9;

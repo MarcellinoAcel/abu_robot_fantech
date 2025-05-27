@@ -57,15 +57,14 @@ unsigned long prev_odom_update = 0;
 unsigned long prevT = 0;
 
 Adafruit_BNO055 bno = Adafruit_BNO055(55, 0x28, &Wire2);
-const int enca[4] = {MOTOR1_ENCODER_A, MOTOR2_ENCODER_A, MOTOR3_ENCODER_A, MOTOR4_ENCODER_A};
-const int encb[4] = {MOTOR1_ENCODER_B, MOTOR2_ENCODER_B, MOTOR3_ENCODER_B, MOTOR4_ENCODER_B};
-volatile long pos[5];
+volatile long pos[6];
 
 PID wheel1(PWM_MIN, PWM_MAX, K_P, K_I, K_D);
 PID wheel2(PWM_MIN, PWM_MAX, K_P, K_I, K_D);
 PID wheel3(PWM_MIN, PWM_MAX, K_P, K_I, K_D);
 PID wheel4(PWM_MIN, PWM_MAX, K_P, K_I, K_D);
-PID dribble(PWM_MIN, PWM_MAX, drib_kp, drib_ki, drib_kd);
+PID launcher_up(0, 180, ESC_UP_KP, ESC_UP_KI, ESC_UP_KD);
+PID launcher_down(0, 180, ESC_DOWN_KP, ESC_DOWN_KI, ESC_DOWN_KD);
 
 Kinematic kinematic(
 	Kinematic::LINO_BASE,
@@ -129,7 +128,8 @@ void setup()
 	attachInterrupt(digitalPinToInterrupt(enca[2]), readEncoder<2>, RISING);
 	attachInterrupt(digitalPinToInterrupt(enca[3]), readEncoder<3>, RISING);
 	attachInterrupt(digitalPinToInterrupt(enca[4]), readEncoder<4>, RISING);
-	pinMode(LED_PIN, OUTPUT);
+	attachInterrupt(digitalPinToInterrupt(enca[5]), readEncoder<5>, RISING);
+
 }
 
 int numbers[8]; // adjust size as needed
@@ -146,6 +146,8 @@ int applyDeadzone(int value, int deadzone = 10)
 	}
 	return value;
 }
+
+int cmd_to_dribble = 0;
 
 void loop()
 {
@@ -180,26 +182,26 @@ void loop()
 	sensors_event_t event;
 	bno.getEvent(&event, Adafruit_BNO055::VECTOR_EULER);
 
-	if ((event.orientation.x >= 0 && event.orientation.x <= 90) ||
-		(event.orientation.x >= 270 && event.orientation.x <= 360))
+	if (cmd_to_dribble == 4)
 	{
-		calculate_smooth_vel(value_upper_launcher, 0, launch_dt, 15.0);
-		calculate_smooth_vel(value_lower_launcher, 0, launch_dt, 15.0);
+		calculate_smooth_vel(value_upper_launcher, 135, launch_dt, 25.0);
+		calculate_smooth_vel(value_lower_launcher, 180, launch_dt, 25.0);
 	}
 	else
 	{
-		calculate_smooth_vel(value_upper_launcher, 180, launch_dt, 15.0);
-		calculate_smooth_vel(value_lower_launcher, 180, launch_dt, 15.0);
+		calculate_smooth_vel(value_upper_launcher, 0, launch_dt, 25.0);
+		calculate_smooth_vel(value_lower_launcher, 0, launch_dt, 25.0);
 	}
 
 	esc_first.write(value_upper_launcher);
 	esc_second.write(value_lower_launcher);
 	launch_prevT = launch_currT;
+	Serial.print(event.orientation.x);
+	Serial.println();
 }
 
 bool buttonPressed = false;
 bool one_cycle = false;
-int cmd_to_dribble = 0;
 
 void linearGo(float speed_go, float speed_break)
 {
@@ -244,15 +246,12 @@ void dribble_pneumatic()
 
 	if (button.RT == 1 && buttonPressed == false)
 	{
-
 		Serial.print(" | button RT | ");
 		cmd_to_dribble = 1;
 		buttonPressed = true;
 	}
 	else if (button.RT == 0 && buttonPressed == true)
 	{
-
-		// Serial.println("stuck out2 forward");
 		buttonPressed = false;
 	}
 	if (button.LT == 1 && cmd_to_dribble == 4)
@@ -266,7 +265,6 @@ void dribble_pneumatic()
 	else if (cmd_to_dribble == 1)
 	{
 		linearGo(150, 0);
-		// delay(100);
 		Serial.print(" | cmd2dribble 1 | ");
 		if (trig_front_limit == 0)
 		{
@@ -296,7 +294,6 @@ void dribble_pneumatic()
 					catching = false;
 				}
 			}
-			// delay(400);
 			else if (prox_dribble_val == 0 && dribble_once == true && catching == false)
 			{
 				Serial.print(" | catching | ");
@@ -337,9 +334,6 @@ void dribble_pneumatic()
 			cmd_to_dribble = 4;
 		}
 	}
-	// Serial.println(detect_count);
-	Serial.print(" | cmd_to_dribble=>");
-	Serial.println(cmd_to_dribble);
 }
 const unsigned long pressDuration = 400;
 const unsigned long releaseDelay = 100;
@@ -382,6 +376,20 @@ void launcher()
 	}
 }
 
+unsigned long launcher_motor_prevT = 0;
+void launcherRoller(float upper, float lower)
+{
+	unsigned long launch_currT = micros();
+	float deltaT = ((float)(launch_currT - launcher_motor_prevT)) / 1.0e6;
+
+	float launcher_upper_controlled = launcher_up.control_speed(upper, pos[4], deltaT);
+	float launcher_lower_controlled = launcher_up.control_speed(lower, pos[5], deltaT);
+
+	esc_first.write(launcher_upper_controlled);
+	esc_second.write(launcher_lower_controlled);
+	launcher_motor_prevT = launch_currT;
+}
+
 joy joySmoothed;
 void moveBase()
 {
@@ -398,17 +406,11 @@ void moveBase()
 	calculate_smooth_vel(joySmoothed.axis1_x, joystick.axis1_x, deltaT, 1.5);
 	calculate_smooth_vel(joySmoothed.axis1_y, joystick.axis1_y, deltaT, 1.5);
 	calculate_smooth_vel(joySmoothed.axis0_y, joystick.axis0_y, deltaT, 1.5);
-	// Serial.print("robot cmdVel=>");
-	// Serial.print(joySmoothed.axis1_x);
-	// Serial.print(",");
-	// Serial.print(joySmoothed.axis1_y);
-	// Serial.print(",");
-	// Serial.print(joySmoothed.axis0_y);
-	// Serial.println();
+
 	Kinematic::rps req_rps;
 	req_rps = kinematic.getRPS(
-		-joySmoothed.axis1_x,
-		-joySmoothed.axis1_y,
+		joySmoothed.axis1_x,
+		joySmoothed.axis1_y,
 		joySmoothed.axis0_y,
 		-event.orientation.x);
 
@@ -439,10 +441,10 @@ void moveBase()
 		controlled_motor4 = 0.0;
 	}
 
-	setMotor(cw[0], ccw[0], controlled_motor4);
-	setMotor(cw[1], ccw[1], controlled_motor2);
-	setMotor(cw[2], ccw[2], controlled_motor3);
-	setMotor(cw[3], ccw[3], controlled_motor1);
+	setMotor(cw[0], ccw[0], controlled_motor1);
+	setMotor(cw[1], ccw[1], controlled_motor3);
+	setMotor(cw[2], ccw[2], controlled_motor2);
+	setMotor(cw[3], ccw[3], controlled_motor4);
 
 	Kinematic::velocities vel = kinematic.getVelocities(
 		current_rps1,
