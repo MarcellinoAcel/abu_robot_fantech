@@ -108,11 +108,7 @@ Kinematic::rps Kinematic::calculateRPS(float linear_x, float linear_y, float ang
     // front-right motor
     float rps_motor4 = -sin(toRad(315 + imu_angular_z)) * x_mps + cos(toRad(315 + imu_angular_z)) * y_mps + robot_radius_ * tan_mps;
     rps.motor4 = fmax(-max_rps_, fmin(rps_motor4, max_rps_));
-/*
-motor1 = -sin(torad(30)) * x + cos(torad(30)) * y + robot_radius * tan
-motor2 = -sin(torad(150)) * x + cos(torad(150)) * y + robot_radius * tan
-motor3 = 
-*/
+
     return rps;
 }
 

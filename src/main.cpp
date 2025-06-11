@@ -7,9 +7,10 @@
 #include <imu.h>
 #include <USBHost_t36.h>
 
-void launcher();
+void launcherPusher();
 void moveBase();
 void setMotor(int cwPin, int ccwPin, float pwmVal);
+void launcherRoller(float upper, float lower);
 template <int j>
 void readEncoder();
 void linearGo(float speed_go, float speed_break);
@@ -114,14 +115,20 @@ void setup()
 		pinMode(enca[i], INPUT);
 		pinMode(encb[i], INPUT);
 	}
+	wheel1.ppr_total(COUNTS_PER_REV1);
+	wheel2.ppr_total(COUNTS_PER_REV2);
+	wheel3.ppr_total(COUNTS_PER_REV3);
+	wheel4.ppr_total(COUNTS_PER_REV4);
+	launcher_down.ppr_total(1023);
+	launcher_up.ppr_total(1023);
 
 	pinMode(prox_back, INPUT_PULLUP);
 	pinMode(prox_front, INPUT_PULLUP);
 
 	pinMode(prox_dribble, INPUT_PULLUP);
 
-	pinMode(laser1, OUTPUT);
-	pinMode(laser2, OUTPUT);
+	pinMode(cylinder_side, OUTPUT);
+	pinMode(cylinder_upper, OUTPUT);
 
 	attachInterrupt(digitalPinToInterrupt(enca[0]), readEncoder<0>, RISING);
 	attachInterrupt(digitalPinToInterrupt(enca[1]), readEncoder<1>, RISING);
@@ -129,14 +136,9 @@ void setup()
 	attachInterrupt(digitalPinToInterrupt(enca[3]), readEncoder<3>, RISING);
 	attachInterrupt(digitalPinToInterrupt(enca[4]), readEncoder<4>, RISING);
 	attachInterrupt(digitalPinToInterrupt(enca[5]), readEncoder<5>, RISING);
-
+	esc_first.write(0);
+	esc_second.write(0);
 }
-
-int numbers[8]; // adjust size as needed
-double value_upper_launcher = 0;
-double value_lower_launcher = 0;
-unsigned long launch_prevT = 0;
-String inputString;
 
 int applyDeadzone(int value, int deadzone = 10)
 {
@@ -148,23 +150,21 @@ int applyDeadzone(int value, int deadzone = 10)
 }
 
 int cmd_to_dribble = 0;
+bool turn_on_roller = false;
+unsigned long time_now_delay = 0;
+unsigned long time_prev_delay = 0;
+bool close_gripper = false;
+int speed_roller = 0;
+bool delay_timer_started = false;
+bool button_A_pressed = false;
+bool button_Y_pressed = false;
 
+unsigned long launcher_motor_prevT = 0;
+float upper_target = 0;
+float lower_target = 0;
 void loop()
 {
 	usb_joy.Task();
-
-	unsigned long launch_currT = micros();
-	float launch_dt = ((float)(launch_currT - launch_prevT)) / 1.0e6;
-
-	int trig_end_limit = digitalRead(prox_back);
-	int trig_start_limit = digitalRead(prox_front);
-
-	if ((trig_end_limit == 0 || trig_start_limit == 0) &&
-		!(button.start == 1 || button.LT == 1))
-	{
-		setMotor(catcher_cw, catcher_ccw, 0);
-	}
-
 	if (joy_control[0].available())
 	{
 		uint32_t buttons = joy_control[0].getButtons();
@@ -177,97 +177,75 @@ void loop()
 
 		moveBase();
 		dribble_pneumatic();
-		launcher();
+		launcherPusher();
 	}
-	sensors_event_t event;
-	bno.getEvent(&event, Adafruit_BNO055::VECTOR_EULER);
 
-	if (cmd_to_dribble == 4)
+	unsigned long launch_currT = micros();
+	float deltaT = ((float)(launch_currT - launcher_motor_prevT)) / 1.0e6;
+
+	if (turn_on_roller)
 	{
-		calculate_smooth_vel(value_upper_launcher, 135, launch_dt, 25.0);
-		calculate_smooth_vel(value_lower_launcher, 180, launch_dt, 25.0);
+		upper_target = 40;
+		lower_target = 40;
 	}
 	else
 	{
-		calculate_smooth_vel(value_upper_launcher, 0, launch_dt, 25.0);
-		calculate_smooth_vel(value_lower_launcher, 0, launch_dt, 25.0);
+		upper_target = 0;
+		lower_target = 0;
 	}
+	float launcher_upper_controlled = launcher_up.control_speed(upper_target, pos[5], deltaT);
+	float launcher_lower_controlled = launcher_down.control_speed(lower_target, pos[4], deltaT);
 
-	esc_first.write(value_upper_launcher);
-	esc_second.write(value_lower_launcher);
-	launch_prevT = launch_currT;
-	Serial.print(event.orientation.x);
+	if (fabs(upper_target) < 0.02)
+	{
+		launcher_lower_controlled = 0.0;
+	}
+	if (fabs(lower_target) < 0.02)
+	{
+		launcher_lower_controlled = 0.0;
+	}
+	esc_first.write(abs(launcher_upper_controlled));
+	esc_second.write(abs(launcher_lower_controlled));
+
 	Serial.println();
+
+	launcher_motor_prevT = launch_currT;
 }
 
 bool buttonPressed = false;
-bool one_cycle = false;
-
-void linearGo(float speed_go, float speed_break)
-{
-	int trig_back_limit = digitalRead(prox_back);
-	int trig_front_limit = digitalRead(prox_front);
-
-	if (speed_go > 0)
-	{
-		if (trig_front_limit == 0)
-		{
-		}
-		else
-		{
-			setMotor(catcher_cw, catcher_ccw, speed_go);
-		}
-	}
-	else if (speed_go < 0)
-	{
-		if (trig_back_limit == 0)
-		{
-		}
-		else
-		{
-			setMotor(catcher_cw, catcher_ccw, speed_go);
-		}
-	}
-	else
-	{
-		setMotor(catcher_cw, catcher_ccw, 0);
-	}
-}
 bool dribble_once = false;
-
 bool catching = false;
-bool ballout = false;
-
 void dribble_pneumatic()
 {
 	int trig_back_limit = digitalRead(prox_back);
 	int trig_front_limit = digitalRead(prox_front);
 	int prox_dribble_val = digitalRead(prox_dribble);
 
-	if (button.RT == 1 && buttonPressed == false)
+	if (button.RT && !buttonPressed)
 	{
 		Serial.print(" | button RT | ");
 		cmd_to_dribble = 1;
 		buttonPressed = true;
 	}
-	else if (button.RT == 0 && buttonPressed == true)
+	else if (!button.RT && buttonPressed)
 	{
 		buttonPressed = false;
 	}
-	if (button.LT == 1 && cmd_to_dribble == 4)
+	if (button.LT)
 	{
 		Serial.print(" | button Lt | ");
 		digitalWrite(cylinder_side, 0);
-		moveBase();
 		delay(10);
+		turn_on_roller = false;
 		cmd_to_dribble = 0;
 	}
 	else if (cmd_to_dribble == 1)
 	{
-		linearGo(150, 0);
 		Serial.print(" | cmd2dribble 1 | ");
+		setMotor(catcher_cw, catcher_ccw, 170);
 		if (trig_front_limit == 0)
 		{
+			setMotor(catcher_cw, catcher_ccw, 0);
 			cmd_to_dribble = 2;
 		}
 	}
@@ -305,16 +283,17 @@ void dribble_pneumatic()
 			}
 			else if (catching == true)
 			{
-				linearGo(-128, 0);
+				setMotor(catcher_cw, catcher_ccw, -150);
 			}
 		}
 		else if (catching == true && trig_back_limit == 1)
 		{
 			Serial.print(" | back | ");
-			linearGo(-128, 0);
+			setMotor(catcher_cw, catcher_ccw, -150);
 		}
 		else if (trig_back_limit == 0 && catching == true)
 		{
+			setMotor(catcher_cw, catcher_ccw, 0);
 			dribble_once = false;
 			digitalWrite(cylinder_side, 1);
 			delay(20);
@@ -325,14 +304,22 @@ void dribble_pneumatic()
 	else if (cmd_to_dribble == 3)
 	{
 		Serial.print(" | cmd2dribble 3 | ");
-		linearGo(-128, 0);
+
+		setMotor(catcher_cw, catcher_ccw, -150);
 		if (trig_back_limit == 0)
 		{
+			setMotor(catcher_cw, catcher_ccw, 0);
 			delay(200);
 			digitalWrite(cylinder_side, 1);
 			delay(20);
+			turn_on_roller = true;
 			cmd_to_dribble = 4;
 		}
+	}
+	else if (button.RB)
+	{
+		digitalWrite(cylinder_side, 0);
+		delay(10);
 	}
 }
 const unsigned long pressDuration = 400;
@@ -341,7 +328,7 @@ bool solenoidActive = false;
 bool waitingToRelease = false;
 bool button_push = false;
 
-void launcher()
+void launcherPusher()
 {
 	static unsigned long actionStart = 0;
 
@@ -376,20 +363,6 @@ void launcher()
 	}
 }
 
-unsigned long launcher_motor_prevT = 0;
-void launcherRoller(float upper, float lower)
-{
-	unsigned long launch_currT = micros();
-	float deltaT = ((float)(launch_currT - launcher_motor_prevT)) / 1.0e6;
-
-	float launcher_upper_controlled = launcher_up.control_speed(upper, pos[4], deltaT);
-	float launcher_lower_controlled = launcher_up.control_speed(lower, pos[5], deltaT);
-
-	esc_first.write(launcher_upper_controlled);
-	esc_second.write(launcher_lower_controlled);
-	launcher_motor_prevT = launch_currT;
-}
-
 joy joySmoothed;
 void moveBase()
 {
@@ -399,18 +372,18 @@ void moveBase()
 	unsigned long currT = micros();
 	float deltaT = ((float)(currT - prevT)) / 1.0e6;
 
-	joystick.axis1_x = map(joystick.axis1_x, 0, 128, 0, 2);
+	joystick.axis1_x = map(-joystick.axis1_x, 0, 128, 0, 2);
 	joystick.axis1_y = map(joystick.axis1_y, 0, 128, 0, 2);
 	joystick.axis0_y = map(joystick.axis0_y, 0, 128, 0, 2);
 
 	calculate_smooth_vel(joySmoothed.axis1_x, joystick.axis1_x, deltaT, 1.5);
 	calculate_smooth_vel(joySmoothed.axis1_y, joystick.axis1_y, deltaT, 1.5);
-	calculate_smooth_vel(joySmoothed.axis0_y, joystick.axis0_y, deltaT, 1.5);
+	calculate_smooth_vel(joySmoothed.axis0_y, joystick.axis0_y, deltaT, 2.0);
 
 	Kinematic::rps req_rps;
 	req_rps = kinematic.getRPS(
 		joySmoothed.axis1_x,
-		joySmoothed.axis1_y,
+		-joySmoothed.axis1_y,
 		joySmoothed.axis0_y,
 		-event.orientation.x);
 
@@ -442,8 +415,8 @@ void moveBase()
 	}
 
 	setMotor(cw[0], ccw[0], controlled_motor1);
-	setMotor(cw[1], ccw[1], controlled_motor3);
-	setMotor(cw[2], ccw[2], controlled_motor2);
+	setMotor(cw[1], ccw[1], controlled_motor2);
+	setMotor(cw[2], ccw[2], controlled_motor3);
 	setMotor(cw[3], ccw[3], controlled_motor4);
 
 	Kinematic::velocities vel = kinematic.getVelocities(
@@ -460,6 +433,23 @@ void moveBase()
 		vel.linear_x,
 		vel.linear_y,
 		vel.angular_z);
+	Odometry::odom robot_pose;
+	robot_pose = odometry.getData();
+	// Serial.print(" | ");
+	// Serial.print(joySmoothed.axis1_x);
+	// Serial.print(" | ");
+	// Serial.print(joySmoothed.axis1_y);
+	// Serial.print(" | ");
+	// Serial.print(joySmoothed.axis0_y);
+	// Serial.print(" | ");
+	// Serial.print(req_rps.motor1);
+	// Serial.print(" | ");
+	// Serial.print(req_rps.motor2);
+	// Serial.print(" | ");
+	// Serial.print(req_rps.motor3);
+	// Serial.print(" | ");
+	// Serial.print(req_rps.motor4);
+	// Serial.print(" | ");
 
 	prevT = currT;
 }

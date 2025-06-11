@@ -6,6 +6,10 @@ PID::PID(float MIN_VAL, float MAX_VAL, float kp_, float ki_, float kd_) : min_va
                                                                           KD(kd_)
 {
 }
+void PID::ppr_total(float total_ppr)
+{
+    PPR = total_ppr;
+}
 void PID::parameter(float kp_, float ki_, float kd_)
 {
 
@@ -23,7 +27,7 @@ void PID::parameterT(float kp_, float ki_, float kd_)
 
 float PID::control_angle(float target, float enc, float pwm, float deltaT)
 {
-    deg2target = target / 360 * 3840;
+    deg2target = target / 360 * PPR;
 
     err.proportional = deg2target - enc;
 
@@ -39,7 +43,7 @@ float PID::control_angle(float target, float enc, float pwm, float deltaT)
 
 float PID::control_angle_speed(float target_angle, float target_speed, float enc, float deltaT)
 {
-    deg2target = target_angle / 360 * 3840;
+    deg2target = target_angle / PPR;
 
     err.proportional = deg2target - enc;
 
@@ -85,7 +89,7 @@ float PID::control_speed(float target, float enc, float deltaT)
 {
     radian = (enc - encPrev) / deltaT;
     encPrev = enc;
-    angular_vel = radian / (total_gear_ratio * enc_ppr);
+    angular_vel = radian / PPR;
 
     angular_vel_Filt = 0.854 * angular_vel_Filt + 0.0728 * angular_vel + 0.0728 * angular_vel_Prev;
     angular_vel_Prev = angular_vel;

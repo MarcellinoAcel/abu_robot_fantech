@@ -27,11 +27,11 @@
 #define K_I 366.101694915
 #define K_D 0
 
-#define ESC_UP_KP 1
-#define ESC_UP_KI 0
+#define ESC_UP_KP 30
+#define ESC_DOWN_KP 30
+#define ESC_UP_KI 1 
+#define ESC_DOWN_KI 1
 #define ESC_UP_KD 0
-#define ESC_DOWN_KP 1
-#define ESC_DOWN_KI 0
 #define ESC_DOWN_KD 0
 
 /*
@@ -69,26 +69,39 @@ LEFT  = Y
 #define PWM_FREQUENCY 25000
 
 // declare encoder pin
-#define MOTOR3_ENCODER_A 14
-#define MOTOR3_ENCODER_B 15
-
-#define MOTOR4_ENCODER_A 28
-#define MOTOR4_ENCODER_B 29
-
 #define MOTOR1_ENCODER_A 17
 #define MOTOR1_ENCODER_B 16
 
 #define MOTOR2_ENCODER_A 26
 #define MOTOR2_ENCODER_B 27
 
-#define LAUNCHER_UP_A 11
-#define LAUNCHER_UP_B 12
+#define MOTOR3_ENCODER_A 14
+#define MOTOR3_ENCODER_B 15
 
-#define LAUNCHER_DOWN_A 38
-#define LAUNCHER_DOWN_B 39
+#define MOTOR4_ENCODER_A 28
+#define MOTOR4_ENCODER_B 29
+
+#define LAUNCHER_UP_A 38
+#define LAUNCHER_UP_B 39
+
+#define LAUNCHER_DOWN_A 12
+#define LAUNCHER_DOWN_B 11
+
 // store encoder in array
-const int enca[6] = {MOTOR1_ENCODER_A, MOTOR2_ENCODER_A, MOTOR3_ENCODER_A, MOTOR4_ENCODER_A, LAUNCHER_DOWN_A, LAUNCHER_UP_A};
-const int encb[6] = {MOTOR1_ENCODER_B, MOTOR2_ENCODER_B, MOTOR3_ENCODER_B, MOTOR4_ENCODER_B, LAUNCHER_DOWN_B, LAUNCHER_UP_B};
+const int enca[6] = {
+    MOTOR1_ENCODER_A,
+    MOTOR2_ENCODER_A,
+    MOTOR3_ENCODER_A,
+    MOTOR4_ENCODER_A,
+    LAUNCHER_DOWN_A,
+    LAUNCHER_UP_A};
+const int encb[6] = {
+    MOTOR1_ENCODER_B,
+    MOTOR2_ENCODER_B,
+    MOTOR3_ENCODER_B,
+    MOTOR4_ENCODER_B,
+    LAUNCHER_DOWN_B,
+    LAUNCHER_UP_B};
 
 // catcher motor
 #define catcher_cw 36
@@ -98,81 +111,69 @@ const int encb[6] = {MOTOR1_ENCODER_B, MOTOR2_ENCODER_B, MOTOR3_ENCODER_B, MOTOR
 #define prox_dribble 31
 
 // esc motor
-#define esc_up 33
-#define esc_down 2
+#define esc_up 2
+#define esc_down 33
 
 // MOTOR PINS
-#define MOTOR3_IN_A 18 // 2
-#define MOTOR3_IN_B 19 // 2
+#define MOTOR1_IN_A 5
+#define MOTOR1_IN_B 6
 
-#define MOTOR4_IN_A 22 // 4
-#define MOTOR4_IN_B 10 // 4
+#define MOTOR2_IN_A 18
+#define MOTOR2_IN_B 19
 
-#define MOTOR1_IN_A 5 // 1
-#define MOTOR1_IN_B 6 // 1
+#define MOTOR3_IN_A 3
+#define MOTOR3_IN_B 4
 
-#define MOTOR2_IN_A 3
-#define MOTOR2_IN_B 4
+#define MOTOR4_IN_A 22
+#define MOTOR4_IN_B 10
 
-const int cw[6] = {MOTOR1_IN_A, MOTOR2_IN_A, MOTOR3_IN_A, MOTOR4_IN_A};
-const int ccw[6] = {MOTOR1_IN_B, MOTOR2_IN_B, MOTOR3_IN_B, MOTOR4_IN_B};
+const int cw[6] = {
+    MOTOR1_IN_A,
+    MOTOR2_IN_A,
+    MOTOR3_IN_A,
+    MOTOR4_IN_A};
+const int ccw[6] = {
+    MOTOR1_IN_B,
+    MOTOR2_IN_B,
+    MOTOR3_IN_B,
+    MOTOR4_IN_B};
 
-/*
-1 = 18, 19
-2 = 5,  6
-3 = 22, 23
-4 = 3,  4
-
-real by elect
-1 = 18, 19
-2 = 22,  23
-3 = 6, 5
-4 = 3,  4
-
-3 = 18, 19
-4 = 5,  6
-2 = 22, 23
-1 = 3,  4
-*/
-// const int pwm[4] ={-1,-1,-1,-1};
 #define PWM_MAX pow(2, PWM_BITS) - 1
 #define PWM_MIN -PWM_MAX
 
 struct but
 {
-     int A;
-     int B;
-     int X;
-     int Y;
-     int RT;
-     int LT;
-     int LB;
-     int RB;
-     int select;
-     int start;
-     int home;
-     int up;
-     int down;
-     int left;
-     int right;
+    int A;
+    int B;
+    int X;
+    int Y;
+    int RT;
+    int LT;
+    int LB;
+    int RB;
+    int select;
+    int start;
+    int home;
+    int up;
+    int down;
+    int left;
+    int right;
 } button;
 
 struct joy
 {
-     double axis0_x;
-     double axis0_y;
-     double axis1_x;
-     double axis1_y;
-     int but_red;
-     int but_blue;
-     int but_black;
-     int but_green;
+    double axis0_x;
+    double axis0_y;
+    double axis1_x;
+    double axis1_y;
+    int but_red;
+    int but_blue;
+    int but_black;
+    int but_green;
 } joystick;
 
 int solenoid = 9;
 
-int laser1 = 20;
-int laser2 = 21;
 int cylinder_upper = 21;
 int cylinder_side = 20;
 
